@@ -1,0 +1,88 @@
+#!/bin/bash
+# Usage: ./runForward
+# Must connect the WAN interface before (using networkmanager or so)
+
+# Interface to be forwarded
+wif="enp3s0"
+# WAN interface
+wan="wlp2s0"
+
+echo "++ runForward v1.0"
+echo "Forward Interface: $wif"
+echo "    WAN Interface: $wan"
+
+
+echo "++ Writing config files"
+echo "interface=$wif
+dhcp-range=10.0.0.3,10.0.0.20,12h
+server=8.8.8.8
+dhcp-option=3,10.0.0.1
+dhcp-option=6,8.8.8.8" > ./dnsmasq.conf
+
+########### Disable NetworkManager ############
+
+echo "++ Stopping NetworkManager managing $wif"
+nmcli device set $wif managed no
+echo "++ NetworkManager $wif unmanaged."
+
+sleep 1
+
+
+########### Initial wifi interface configuration #############
+echo "++ Setting addresses for $wif interface"
+ip link set $wif down
+ip addr flush dev $wif
+ip link set $wif up
+ip addr add 10.0.0.1/24 dev $wif
+
+echo "++ ip config done"
+ 
+# If you still use ifconfig for some reason, replace the above lines with the following
+# ifconfig $1 up 10.0.0.1 netmask 255.255.255.0
+sleep 1
+###########
+ 
+########### Start dnsmasq ##########
+echo "++ Starting dnsmasq"
+dnsmasq -d -C ./dnsmasq.conf -x ./dnsmasq.pid -p 0 &
+
+sleep 1
+
+#if [ $? ]; then
+#	echo "Failed to start dnsmasq, exiting"
+#	exit
+#fi
+###########
+########### Enable NAT ############
+echo "++ Setting iptables rules and sysctl"
+sysctl -w net.ipv4.ip_forward=1
+
+iptables -t nat -A POSTROUTING -o $wan -j MASQUERADE
+iptables -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+iptables -A FORWARD -i $wif -o $wan -j ACCEPT
+
+echo "++ iptables done"
+ 
+#Thanks to lorenzo
+#Uncomment the line below if facing problems while sharing PPPoE, see lorenzo's comment for more details
+#iptables -I FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
+ 
+###########
+
+
+sleep 2
+
+echo "== Forwarding network traffic from $wif to $wan"
+
+########## Start hostapd ###########
+read
+
+########## restore state and clean up
+echo "++ shutting down"
+echo "++ Stopping dnsmasq"
+killall dnsmasq
+
+echo "++ Make NetworkManager manage $wif again"
+nmcli device set $wif managed yes
+
+echo "++ Done. Exit."
