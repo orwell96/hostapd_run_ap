@@ -57,6 +57,11 @@ In most cases, this error means that some other program is operating on your net
 
 There might also be another cause for this error. I can not provide further assistance in this case. Try to find advice by googling.
 
+## runForward
+The runForward script is a copy of runAP that does the work of forwarding network traffic without actually opening a Wi-Fi hotspot. I use it to give older computers without a WiFi card access to the internet by connecting it using LAN and logging into the home Wi-Fi.
+
+It works like the runAP script except that it does neither require nor invoke hostapd.
+
 ## License and disclaimer
 
  Copyright (C) 2019 orwell96 <orwell@bleipb.de>
